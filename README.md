@@ -9,6 +9,7 @@ Agent skills for Claude Code, Cursor, Codex, and other coding agents.
 | [csv-analyzer](./skills/csv-analyzer) | Analyze large CSV files (1M+ rows) with DuckDB and Polars | `npx skills add https://github.com/ysm-dev/skills/tree/main/skills/csv-analyzer` |
 | [ddgr](./skills/ddgr) | Search the web using DuckDuckGo via ddgr CLI | `npx skills add https://github.com/ysm-dev/skills/tree/main/skills/ddgr` |
 | [duckdb-cli](./skills/duckdb-cli) | Query and analyze data (CSV/Parquet/JSON) using DuckDB CLI | `npx skills add https://github.com/ysm-dev/skills/tree/main/skills/duckdb-cli` |
+| [wachi](./skills/wachi) | Install and use wachi CLI to monitor any URL for new content and get notifications via 90+ services | `npx skills add https://github.com/ysm-dev/skills/tree/main/skills/wachi` |
 
 ## Installation
 
@@ -23,6 +24,9 @@ npx skills add https://github.com/ysm-dev/skills/tree/main/skills/ddgr
 
 # Install duckdb-cli
 npx skills add https://github.com/ysm-dev/skills/tree/main/skills/duckdb-cli
+
+# Install wachi
+npx skills add https://github.com/ysm-dev/skills/tree/main/skills/wachi
 ```
 
 ## License
