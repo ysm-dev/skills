@@ -1,0 +1,23 @@
+{
+  "skill_name": "ddgr",
+  "evals": [
+    {
+      "id": 0,
+      "prompt": "What's the latest stable version of Node.js? I need to know before I update my project.",
+      "expected_output": "Reports the current Node.js LTS version with a source URL from the search results",
+      "files": []
+    },
+    {
+      "id": 1,
+      "prompt": "I'm getting this error when I run my Django app: `django.db.utils.OperationalError: no such table: auth_user`. How do I fix this?",
+      "expected_output": "Searches for the error, finds relevant Stack Overflow or documentation results, and provides a fix (run migrations)",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Help me set up a new SvelteKit project with the latest recommended configuration and deployment on Vercel.",
+      "expected_output": "Proactively searches for current SvelteKit setup guides and Vercel deployment docs, provides up-to-date instructions",
+      "files": []
+    }
+  ]
+}
