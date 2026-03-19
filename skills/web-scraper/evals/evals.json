@@ -1,0 +1,87 @@
+{
+  "skill_name": "web-scraper",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Scrape the list of trending repositories from github.com/trending and give me a CSV with repo name, description, stars, and language",
+      "expected_output": "A CSV file in the current directory with columns: repo name, description, stars, language. Data from GitHub trending page.",
+      "files": [],
+      "expectations": [
+        "A .csv file exists in the outputs directory",
+        "The CSV contains columns for repo name, description, stars, and language",
+        "The CSV has at least 10 data rows",
+        "The process used agent-browser and HAR capture (not curl/fetch/requests directly)",
+        "No .har or .py files are in the outputs directory"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "I need to get all the product listings from https://books.toscrape.com/ — title, price, rating, and availability as JSON",
+      "expected_output": "A JSON file in the current directory with an array of book objects containing title, price, rating, and availability. Should handle pagination across multiple pages.",
+      "files": [],
+      "expectations": [
+        "A .json file exists in the outputs directory",
+        "The JSON objects contain fields for title, price, rating, and availability",
+        "The JSON contains more than 20 records (indicating pagination was handled)",
+        "The output is valid parseable JSON",
+        "The process used agent-browser and HAR capture (not curl/fetch/requests directly)",
+        "No .har or .py files are in the outputs directory"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Can you grab the top posts from news.ycombinator.com and save them as a CSV?",
+      "expected_output": "A CSV file with Hacker News top posts including title, URL, points, and author.",
+      "files": [],
+      "expectations": [
+        "A .csv file exists in the outputs directory",
+        "The CSV contains columns for title and URL/link",
+        "The CSV has at least 10 data rows",
+        "The process used agent-browser and HAR capture (not curl/fetch/requests directly)",
+        "No .har or .py files are in the outputs directory"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "get me all the quotes and authors from https://quotes.toscrape.com in a tsv file",
+      "expected_output": "A TSV file in the current directory with columns for quote text and author name.",
+      "files": [],
+      "expectations": [
+        "A .tsv file exists in the outputs directory",
+        "The file contains columns for quote text and author",
+        "The file uses tab delimiters (not commas)",
+        "The file has more than 10 quotes (indicating pagination was handled)",
+        "The process used agent-browser and HAR capture (not curl/fetch/requests directly)",
+        "No .har or .py files are in the outputs directory"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "I want to scrape the exchange rates table from https://www.x-rates.com/table/?from=USD&amount=1 and save it as CSV",
+      "expected_output": "A CSV file with currency exchange rates including currency name and rate against USD.",
+      "files": [],
+      "expectations": [
+        "A .csv file exists in the outputs directory",
+        "The CSV contains columns for currency name and exchange rate",
+        "The CSV has at least 20 data rows (currencies)",
+        "Rate values in the CSV are valid numbers",
+        "The process used agent-browser and HAR capture (not curl/fetch/requests directly)",
+        "No .har or .py files are in the outputs directory"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "scrape https://realpython.github.io/fake-jobs/ for all the job listings. i want company name, job title, location, and the apply link. csv please",
+      "expected_output": "A CSV file with columns: company name, job title, location, apply link. All job listings from the fake jobs page.",
+      "files": [],
+      "expectations": [
+        "A .csv file exists in the outputs directory",
+        "The CSV contains columns for company name, job title, location, and apply link",
+        "The CSV has at least 50 data rows",
+        "The apply link column contains valid URLs",
+        "The process used agent-browser and HAR capture (not curl/fetch/requests directly)",
+        "No .har or .py files are in the outputs directory"
+      ]
+    }
+  ]
+}
