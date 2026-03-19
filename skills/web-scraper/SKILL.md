@@ -1,131 +1,249 @@
 ---
 name: web-scraper
-description: Bulk web scraping via HAR-based API discovery. Use when the user asks to scrape, download, or export bulk data from a website (e.g., "download all Hacker News posts from Dec 2025", "scrape all jobs from YC job board", "export all products from this catalog", "get all comments from this thread"). Triggers on requests involving collecting many records/pages from a web source and saving as CSV, JSON, or other structured formats.
+description: "Use when the user wants to scrape, crawl, or extract data from a website or URL. Triggers on: 'scrape this site', 'get data from this URL', 'crawl this page', 'extract data from the web', 'pull data from this link', 'download data from this website', 'I need data from [URL]', or any request involving collecting structured data from a web page. Also triggers when the user provides a URL and asks for its data in CSV, JSON, or other tabular formats. Always load the agent-browser skill alongside this one."
 ---
 
-# Web Scraper
+# Web Scraper — API-First Approach via HAR Capture
 
-Bulk-scrape structured data from websites by discovering APIs through HAR capture, then generating and running scraping code.
+This skill extracts structured data from websites by capturing network traffic rather than parsing HTML. The core idea: every dynamic web page fetches its data from backend APIs. By recording the browser's network activity, you can discover those APIs and call them directly — producing scraping code that is faster, more reliable, and less likely to break when the page redesign happens.
 
-When this `web-scraper` skill is used, always load the `agent-browser` skill together with it for browser automation steps.
+**Always use the `agent-browser` skill for all browser operations.** Do not use `curl`, `fetch`, `wget`, or similar tools to load pages. The browser handles JavaScript rendering, authentication cookies, and dynamic content that simple HTTP clients miss.
 
-## Temp Directory
-
-At the start of every scrape session, create a unique working directory under `/tmp`:
+## Workflow Overview
 
 ```
-/tmp/scrape-<slug>/
+1. Set up temp workspace
+2. Open URL in headed browser + start HAR recording
+3. Handle authentication if needed (user logs in manually)
+4. Wait for page to fully load, interact if needed to trigger data requests
+5. Stop HAR recording → save .har to temp workspace
+6. Analyze .har to identify data-serving API endpoints
+7. Write Python scraping code that calls those APIs
+8. Run the code → save results to current directory
 ```
 
-Derive `<slug>` from the task (e.g., `scrape-hn-dec2025`, `scrape-yc-jobs-2026`). Keep it short, lowercase, hyphenated. All intermediate files (HAR, scripts, logs) go here. This prevents collisions between sessions.
+## Step 1: Set Up Temp Workspace
 
-## Workflow
-
-### 1. Clarify Requirements
-
-Before starting, confirm:
-
-- **Target URL** and what data to collect (e.g., "all posts", "all job listings")
-- **Output format**: CSV (default), JSON, or other format the user specifies
-- **Scope/filters**: date range, categories, search terms, pagination limits
-
-### 2. Open Site and Capture HAR
-
-Open the target page with `agent-browser`, start HAR capture, then interact with the page to trigger API calls (scroll, paginate, click "load more", apply filters).
+Create an isolated temp directory for all intermediate files. Only the final output belongs in the user's current directory.
 
 ```bash
-agent-browser open <target-url>
-agent-browser har start
-agent-browser snapshot -i
-# Interact: scroll, click pagination, expand sections to trigger API calls
+SCRAPE_TMP="/tmp/web-scraper-$(echo '<domain>' | tr '/:' '-')-$(date +%s)"
+mkdir -p "$SCRAPE_TMP"
+```
+
+All intermediate files go here: `.har` files, analysis notes, scraping scripts, debug logs.
+
+## Step 2: Open the Target URL and Start HAR Recording
+
+Open the browser in **headed mode** so the user can see what's happening (and manually authenticate if needed). Start HAR recording before navigating so you capture every request the page makes.
+
+```bash
+agent-browser --headed network har start
+agent-browser --headed open <target-url>
+agent-browser wait --load networkidle
+```
+
+The `--headed` flag is important — it lets the user visually confirm the page loaded correctly and intervene for login flows.
+
+## Step 3: Handle Authentication
+
+If the target page requires login, the browser will show the login page. Ask the user to log in manually in the headed browser window. Guide them:
+
+> "The browser is open. Please log in if the site requires authentication. Let me know when you're on the page with the data you want to scrape."
+
+After the user confirms they've logged in and navigated to the data page, proceed. If additional interaction is needed to reveal the data (clicking tabs, expanding sections, scrolling to trigger lazy loading), do it via `agent-browser` commands or ask the user to do it in the headed window.
+
+For pages that load data progressively or via infinite scroll:
+
+```bash
 agent-browser scroll down 3000
 agent-browser wait --load networkidle
-# If there is pagination or "load more", click it
-agent-browser click @e<next-page-ref>
-agent-browser wait --load networkidle
-agent-browser har stop /tmp/scrape-<slug>/capture.har
 ```
 
-Key: trigger as many data-fetching requests as possible -- paginate, scroll, filter, search -- so the HAR captures the underlying API endpoints and their parameters.
+Repeat scrolling if the page uses infinite scroll and the user wants more data. Each scroll may trigger new API calls that the HAR will capture.
 
-### 3. Analyze HAR
+## Step 4: Capture the HAR File
 
-Read `/tmp/scrape-<slug>/capture.har` and identify:
-
-- **API endpoints** returning structured data (JSON responses with arrays of records)
-- **Request patterns**: URL structure, query parameters for pagination (`page`, `offset`, `cursor`, `limit`), auth headers, cookies
-- **Response structure**: field names, nesting, total count / `hasMore` flags
-- **Pagination mechanism**: page numbers, cursor-based, offset-based, or infinite scroll
-
-Prioritize XHR/fetch requests returning JSON over HTML page loads. Look for endpoints with large arrays of items -- these are the data APIs.
-
-Ignore static assets (images, CSS, JS bundles, fonts), tracking/analytics calls, and ad network requests.
-
-### 4. Write Scraping Code
-
-Write a Python script to `/tmp/scrape-<slug>/scraper.py` that:
-
-- Hits the discovered API endpoint(s) directly (no browser needed)
-- Handles pagination by iterating through all pages/cursors
-- Copies necessary headers/cookies from the HAR (auth tokens, session cookies, user-agent)
-- Includes rate limiting (`time.sleep`) to be respectful -- 0.5-1s between requests
-- Collects all records into a list
-- Handles errors gracefully (retries on 429/5xx, logs failures)
-- Saves results in the user's requested format to the **current working directory**
-
-Use only Python standard library (`urllib.request`, `json`, `csv`, `time`) unless the user has specific library preferences. This avoids dependency issues.
-
-If direct API access is not possible (no JSON API found, heavy anti-bot protection, data only in rendered HTML), fall back to browser-based scraping:
-
-- Write a script that uses `agent-browser` commands via `subprocess` to navigate and extract data page by page
-- Use `agent-browser eval` or `agent-browser get text` to pull data from the DOM
-
-### 5. Run and Verify
+Once the data is visible on the page, stop the HAR recording:
 
 ```bash
-python3 /tmp/scrape-<slug>/scraper.py
+agent-browser network har stop "$SCRAPE_TMP/capture.har"
 ```
 
-After running:
+Close the browser session when done:
 
-- Check the output file exists in the current directory and has the expected number of records
-- Show the user a preview: first 5 rows for CSV, first 2 records for JSON
-- Report total record count
+```bash
+agent-browser close
+```
 
-If the script fails (auth expired, rate limited, structure changed), diagnose and fix `/tmp/scrape-<slug>/scraper.py` then re-run.
+## Step 5: Analyze the HAR File
 
-### 6. Clean Up
+This is the most important analytical step. Read and parse the `.har` file to find the API endpoints that serve the actual data.
 
-Report to the user:
+What to look for:
 
-- Output file path and record count
-- Any records that were skipped or errored
+1. **JSON/XML API responses** — Requests returning `application/json` or `application/xml` with structured data in the response body. These are the primary targets.
+2. **GraphQL endpoints** — POST requests to paths like `/graphql` or `/api/graphql` with query payloads.
+3. **Paginated APIs** — Look for query parameters like `page`, `offset`, `limit`, `cursor`, `after`, `pageToken` in the URLs or request bodies.
+4. **Authentication headers** — Note any `Authorization`, `Cookie`, `X-API-Key`, or custom auth headers that the API requests carry. The scraping code needs to replicate these.
+5. **Request patterns** — Identify which requests are for the actual data vs. static assets (JS, CSS, images, fonts, analytics/tracking). Filter out noise.
 
-The temp directory (`/tmp/scrape-<slug>/`) is left for debugging. Only the final data file lives in the current working directory.
+Write a Python script to parse the HAR and extract relevant requests:
 
-## File Placement Rules
+```python
+import json
 
-| File                        | Location                         | Reason                                |
-| --------------------------- | -------------------------------- | ------------------------------------- |
-| Temp directory              | `/tmp/scrape-<slug>/`            | Unique per session, avoids collisions |
-| HAR capture                 | `/tmp/scrape-<slug>/capture.har` | Temporary debug artifact              |
-| Scraper script              | `/tmp/scrape-<slug>/scraper.py`  | Temporary tool, not project code      |
-| Output data (CSV/JSON/etc.) | `./` (current directory)         | User's requested deliverable          |
+with open("capture.har") as f:
+    har = json.load(f)
 
-## Pagination Patterns Cheat Sheet
+for entry in har["log"]["entries"]:
+    url = entry["request"]["url"]
+    method = entry["request"]["method"]
+    status = entry["response"]["status"]
+    mime = entry["response"]["content"].get("mimeType", "")
 
-| Pattern      | Signal in HAR                    | How to iterate                                        |
-| ------------ | -------------------------------- | ----------------------------------------------------- |
-| Page number  | `?page=1`, `?p=2`                | Increment page param until empty response             |
-| Offset/limit | `?offset=0&limit=25`             | Increment offset by limit until count reached         |
-| Cursor       | `?cursor=abc123`, `?after=xyz`   | Use `nextCursor`/`endCursor` from response until null |
-| Link header  | `Link: <...?page=3>; rel="next"` | Follow `next` link until absent                       |
-| Total count  | `"total": 500` in response       | Calculate total pages from total and page size        |
-| hasMore flag | `"hasMore": true`                | Continue until `hasMore` is false                     |
+    # Focus on API responses with data
+    if "json" in mime or "xml" in mime:
+        print(f"{method} {status} {url}")
+        # Check response size to gauge data volume
+        size = entry["response"]["content"].get("size", 0)
+        print(f"  Size: {size} bytes")
+```
 
-## Anti-Pattern Awareness
+Save this analysis script to the temp workspace and run it. Review the output to identify which endpoint(s) serve the data the user wants.
 
-- **Always check for APIs first.** JSON APIs are more reliable and efficient than HTML scraping. But if no API exists (server-rendered pages, no XHR/fetch calls in HAR), HTML scraping is perfectly valid -- use `agent-browser eval` or `agent-browser get text` to extract data from the DOM.
-- **Never dump all data to /tmp.** Only intermediate/debug files go to /tmp; the user's data goes to current directory.
-- **Never skip pagination.** Always verify total records match expectations. If the site says "500 results" but you only got 25, pagination is incomplete.
-- **Never ignore rate limits.** If you get 429 responses, increase sleep time. Be respectful.
+## Step 6: Write the Scraping Code
+
+Based on the HAR analysis, write a Python script using `requests` (or `httpx`) that:
+
+1. **Calls the discovered API endpoint(s) directly** — replicate the exact headers, cookies, and parameters from the HAR
+2. **Handles pagination** — if the API uses pagination, loop through all pages
+3. **Extracts and flattens the data** — navigate the JSON response structure to pull out the fields the user wants
+4. **Outputs to the requested format** — CSV by default, or JSON/TSV if specified
+
+### Pagination Strategies
+
+If the HAR reveals pagination parameters, implement the appropriate strategy:
+
+- **Offset-based** (`offset=0&limit=50`): Increment offset by limit each iteration until empty response
+- **Page-based** (`page=1`): Increment page number until empty or past total pages
+- **Cursor-based** (`cursor=abc123` or `after=xyz`): Use the cursor from each response to fetch the next page
+- **Token-based** (`pageToken=...`): Similar to cursor, use `nextPageToken` from response
+
+### Template Structure
+
+```python
+import requests
+import csv
+import json
+import sys
+
+# --- Configuration ---
+BASE_URL = "<api-endpoint-from-har>"
+HEADERS = {
+    # Replicate relevant headers from HAR
+}
+COOKIES = {
+    # Replicate session cookies from HAR if needed
+}
+PARAMS = {
+    # Base query parameters from HAR
+}
+OUTPUT_FORMAT = "csv"  # or "json", "tsv"
+
+def fetch_page(page_param):
+    """Fetch a single page of data."""
+    params = {**PARAMS, **page_param}
+    resp = requests.get(BASE_URL, headers=HEADERS, cookies=COOKIES, params=params)
+    resp.raise_for_status()
+    return resp.json()
+
+def extract_records(data):
+    """Extract the list of records from the API response.
+    Adjust the key path based on the actual response structure."""
+    # e.g., return data["results"] or data["data"]["items"]
+    pass
+
+def scrape_all():
+    """Fetch all pages and collect records."""
+    all_records = []
+    # Implement pagination loop based on detected strategy
+    # ...
+    return all_records
+
+def save_csv(records, output_path):
+    if not records:
+        print("No records found.")
+        return
+    with open(output_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=records[0].keys())
+        writer.writeheader()
+        writer.writerows(records)
+    print(f"Saved {len(records)} records to {output_path}")
+
+def save_json(records, output_path):
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(records, f, indent=2, ensure_ascii=False)
+    print(f"Saved {len(records)} records to {output_path}")
+
+def save_tsv(records, output_path):
+    if not records:
+        print("No records found.")
+        return
+    with open(output_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=records[0].keys(), delimiter="\t")
+        writer.writeheader()
+        writer.writerows(records)
+    print(f"Saved {len(records)} records to {output_path}")
+
+if __name__ == "__main__":
+    records = scrape_all()
+    output_path = sys.argv[1] if len(sys.argv) > 1 else "output.csv"
+    if OUTPUT_FORMAT == "json":
+        save_json(records, output_path)
+    elif OUTPUT_FORMAT == "tsv":
+        save_tsv(records, output_path)
+    else:
+        save_csv(records, output_path)
+```
+
+Save the scraping script to `$SCRAPE_TMP/scraper.py`.
+
+## Step 7: Run and Deliver Results
+
+Run the scraping script and save the output to the user's **current working directory**:
+
+```bash
+python "$SCRAPE_TMP/scraper.py" "./output.csv"
+```
+
+After successful execution:
+- Confirm the output file location and record count to the user
+- Offer a preview of the first few rows
+- If the user wants a different format, re-run with the appropriate format flag
+
+## File Organization Rules
+
+| File | Location |
+|------|----------|
+| Final output (`.csv`, `.json`, `.tsv`) | Current working directory (`./`) |
+| HAR capture file | `$SCRAPE_TMP/capture.har` |
+| HAR analysis script | `$SCRAPE_TMP/analyze_har.py` |
+| Scraping script | `$SCRAPE_TMP/scraper.py` |
+| Debug logs | `$SCRAPE_TMP/` |
+
+Tell the user where the temp files are in case they want to inspect them, but don't clutter their project directory with intermediates.
+
+## Troubleshooting
+
+**No useful API endpoints found in HAR:**
+Some pages render data server-side (SSR) without separate API calls. In this case, fall back to extracting data from the HTML response in the HAR, or use `agent-browser` to extract text from the rendered page via `snapshot` or `get text` commands. This is a last resort — the API-first approach should be tried first.
+
+**Authentication tokens expire quickly:**
+If captured cookies/tokens are short-lived, note this to the user. The scraping script may need to be run promptly after HAR capture, or you may need to implement a token refresh mechanism.
+
+**Rate limiting or blocking:**
+If the API returns 429 or 403 errors, add delays between requests (`time.sleep()`) and respect `Retry-After` headers. Inform the user about rate limits.
+
+**CORS or origin checks:**
+Some APIs validate the `Origin` or `Referer` header. Make sure to replicate these headers from the HAR in the scraping code.
