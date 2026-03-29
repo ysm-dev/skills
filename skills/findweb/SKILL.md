@@ -79,18 +79,6 @@ By default findweb returns 3 results. Use `-n` for more:
 findweb -n 10 "react useEffect cleanup"
 ```
 
-### Region and Language
-
-Target specific regions or languages when relevant:
-
-```bash
-# Korean results
-findweb --gl kr --lang ko "startup"
-
-# Japanese results
-findweb --gl jp --lang ja "query"
-```
-
 ### Batch Search
 
 Search multiple queries at once — each runs in a separate Chrome tab:
