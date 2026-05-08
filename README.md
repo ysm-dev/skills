@@ -7,7 +7,7 @@ Agent skills for Claude Code, Cursor, Codex, and other coding agents.
 | Skill | Description | Install |
 |-------|-------------|---------|
 | [csv-analyzer](./skills/csv-analyzer) | Analyze large CSV files (1M+ rows) with DuckDB and Polars | `npx skills add https://github.com/ysm-dev/skills/tree/main/skills/csv-analyzer` |
-| [web-search](./skills/web-search) | DuckDuckGo web search via ddgr CLI — search, then fetch full pages with WebFetch | `npx skills add https://github.com/ysm-dev/skills/tree/main/skills/web-search` |
+| [web-search](./skills/web-search) | DuckDuckGo web search via duckduckgo-cli (`ddg`) — search, then fetch full pages with WebFetch | `npx skills add https://github.com/ysm-dev/skills/tree/main/skills/web-search` |
 | [duckdb-cli](./skills/duckdb-cli) | Query and analyze data (CSV/Parquet/JSON) using DuckDB CLI | `npx skills add https://github.com/ysm-dev/skills/tree/main/skills/duckdb-cli` |
 | [findweb](./skills/findweb) | Google search CLI powered by system Chrome — search the web, look up docs, debug errors | `npx skills add https://github.com/ysm-dev/skills/tree/main/skills/findweb` |
 | [wachi](./skills/wachi) | Install and use wachi CLI to monitor any URL for new content and get notifications via 90+ services | `npx skills add https://github.com/ysm-dev/skills/tree/main/skills/wachi` |
